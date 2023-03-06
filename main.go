@@ -4,14 +4,23 @@ import (
 	"fmt"
 	"log"
 	"net/smtp"
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
+
+type Config struct {
+	AppPort	string `mapstructure:"APP_PORT"`
+	EmailFrom string `mapstructure:"EMAIL_FROM"`
+	EmailPassword string `mapstructure:"EMAIL_PASSWORD"`
+	EmailRecipient string `mapstructure:"EMAIL_RECIPIENT"`
+	EmailSubject string `mapstructure:"EMAIL_SUBJECT"`
+	SmtpHost string `mapstructure:"SMTP_HOST"`
+	SmtpPort string `mapstructure:"SMTP_PORT"`
+}
 
 type Request struct {
 	Recipients 	string `json:"recipients"`  
@@ -19,12 +28,28 @@ type Request struct {
     Message 	string `json:"message"`
 }
 
+func loadConfig(path string) (config Config, err error) {
+	viper.SetConfigFile(path)
+
+	viper.AutomaticEnv()
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.Unmarshal(&config)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func main() {
-	// load config from .env
-	err := godotenv.Load(".env")
+	// load config
+	config, err := loadConfig(".env")
 	if err != nil {
 		fmt.Println("Error loading config: ", err.Error())
-		os.Exit(1)
 	}
 	
 	// create new fiber app, user cors, and logger
@@ -43,7 +68,7 @@ func main() {
 		}
 
 		// call function to handle the email sending
-        err := sendEmail(request.Subject, request.Message, request.Recipients)
+        err := sendEmail(config, request.Subject, request.Message, request.Recipients)
         if err != nil {
 			fmt.Println("Error sending email: ", err.Error())
             return c.SendStatus(400)
@@ -52,34 +77,34 @@ func main() {
     })
 
 	// listen on port that comes from .env
-    log.Fatal(app.Listen(os.Getenv("APP_PORT")))
+	log.Fatal(app.Listen(config.AppPort))
 }
 
 // this function takes a message body and a list of email recipients
 // sets up the smtp, auth and message and tries to send an email
 // it returns an error
-func sendEmail(emailSubject string, messageBody string, recipients string) error {
+func sendEmail(config Config, emailSubject string, messageBody string, recipients string) error {
 	// set up from/to and app password
-	from := os.Getenv("EMAIL_FROM")
-	password := os.Getenv("EMAIL_PASSWORD")
+	from := config.EmailFrom
+	password := config.EmailPassword
 
 	// if list is empty, get email recipient from .env
 	var recipientList []string
 	if(len(recipients) == 0) {
-		recipientList = strings.Split(os.Getenv("EMAIL_RECIPIENT"), ",")
+		recipientList = strings.Split(config.EmailRecipient, ",")
 	} else {
 		recipientList = strings.Split(recipients, ",")	
 	}
 
 	// smtp server setup
-	host := os.Getenv("SMTP_HOST")
-	port := os.Getenv("SMTP_PORT")
+	host := config.SmtpHost
+	port := config.SmtpPort
 	address := host + ":" + port
 
 	// is subject is empty, get it from .env
 	var subject string
 	if(len(emailSubject) == 0) {
-		subject = os.Getenv("EMAIL_SUBJECT")
+		subject = config.EmailSubject
 	} else {
 		subject = fmt.Sprintf("Subject: %v\n", emailSubject)
 	}
