@@ -56,7 +56,7 @@ func main() {
     })
 
 	// listen on port that comes from .env
-	log.Fatal(app.Listen(os.Getenv("APP_PORT")))
+	log.Fatal(app.Listen("0.0.0.0:" + os.Getenv("APP_PORT")))
 }
 
 // this function takes a message body and a list of email recipients
