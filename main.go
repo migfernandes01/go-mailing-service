@@ -35,6 +35,10 @@ func main() {
     app := fiber.New()
 	app.Use(cors.New())
     app.Use(logger.New())
+
+	app.Get("/", func (c *fiber.Ctx) error {
+		return c.SendString("Serivce is online!")
+	})
 	
 	// api endpoint handler
     app.Post("/api/send", func (c *fiber.Ctx) error {
